@@ -1,0 +1,21 @@
+# 화이트리스트 방식: 기본은 모두 제외하고, 아래 명시한 파일만 저장소에 올림.
+# PDF, 변환 결과, 청크, 임베딩, 평가 질의(eval_queries.json), 검증 문서는 문서 내용을 담고 있으므로 올리지 않음.
+/*
+!/.gitignore
+!/README.md
+!/SETUP_GUIDE.md
+!/requirements.txt
+!/env.sh
+!/run_convert.py
+!/chunk.py
+!/build_index.py
+!/search.py
+!/search2.py
+!/ask.py
+!/eval_queries.example.json
+!/.claude/
+/.claude/*
+!/.claude/agents/
+/.claude/agents/*
+!/.claude/agents/rag-answerer.md
+__pycache__/
