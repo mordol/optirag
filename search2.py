@@ -1,20 +1,12 @@
 """Phase 2 사전 검증: dense / BM25 / hybrid(RRF) / hybrid+rerank 비교. 결과는 retrieval_results_v2.json"""
-import json, re, time
+import json, time
 import numpy as np
 from rank_bm25 import BM25Okapi
 from sentence_transformers import CrossEncoder, SentenceTransformer
 from search import QUERIES
+from retriever import bm25_tokens
 
 K, POOL, RRF_K = 5, 30, 60
-
-
-def bm25_tokens(text):
-    """영숫자 식별자는 단어 단위, 한글은 글자 bigram (형태소 분석기 없이 조사 붙은 어절 대응)"""
-    text = text.lower()
-    toks = re.findall(r"[a-z0-9_]+", text)
-    for run in re.findall(r"[가-힣]+", text):
-        toks += [run] if len(run) == 1 else [run[i:i + 2] for i in range(len(run) - 1)]
-    return toks
 
 
 chunks = [json.loads(l) for l in open("chunks.jsonl")]

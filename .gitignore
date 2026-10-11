@@ -13,6 +13,8 @@
 !/search.py
 !/search2.py
 !/ask.py
+!/retriever.py
+!/mcp_server.py
 !/eval_queries.example.json
 !/exclude_rules.example.yaml
 !/.claude/

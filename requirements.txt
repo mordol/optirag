@@ -6,6 +6,7 @@ torch==2.14.1
 numpy==2.5.3
 rank-bm25==0.2.2
 pyyaml==6.0.3  # chunk.py 문장 제외 규칙(exclude_rules.yaml) 로드용
+mcp==2.3.0  # mcp_server.py (Claude Desktop·Codex 등에서 검색 도구로 사용)
 # 품질 검증용(선택): 원문 대조·페이지 렌더링
 pypdf==6.19.0
 pypdfium2==5.14.0

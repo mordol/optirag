@@ -1,7 +1,7 @@
-"""질의 → hybrid(bge-m3 + BM25) + rerank top-k → rag-answerer(LLM)가 출처 인용 답변
+"""질의 → hybrid(bge-m3 + BM25) + rerank top-k(retriever.py) → rag-answerer(LLM)가 출처 인용 답변
 usage: python ask.py "질문" [-k 10] [--no-llm] [--model claude-opus-5-5] [--effort medium]"""
 import argparse, datetime, json, os, subprocess
-from search2 import chunks, rankings
+from retriever import Retriever
 
 ap = argparse.ArgumentParser()
 ap.add_argument("question")
@@ -11,8 +11,7 @@ ap.add_argument("--model", default="claude-opus-5-5")
 ap.add_argument("--effort", default="medium")
 a = ap.parse_args()
 
-R, _ = rankings(a.question)
-hits = [chunks[i] for i in R["hybrid+rerank"][:a.k]]
+hits = Retriever().search(a.question, a.k)
 lines = [f"# 질문\n{a.question}\n\n# 검색된 자료 (hybrid+rerank top-{a.k})\n"]
 for n, c in enumerate(hits, 1):
     pg = f"p.{c['page']}" + (f"-{c['page_end']}" if c["page_end"] != c["page"] else "")
