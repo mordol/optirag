@@ -1,5 +1,6 @@
 # 화이트리스트 방식: 기본은 모두 제외하고, 아래 명시한 파일만 저장소에 올림.
 # PDF, 변환 결과, 청크, 임베딩, 평가 질의(eval_queries.json), 검증 문서는 문서 내용을 담고 있으므로 올리지 않음.
+# 문장 제외 규칙(exclude_rules.yaml)도 문서 출처가 드러날 수 있어 로컬 전용. 예시 파일만 올림.
 /*
 !/.gitignore
 !/README.md
@@ -13,6 +14,7 @@
 !/search2.py
 !/ask.py
 !/eval_queries.example.json
+!/exclude_rules.example.yaml
 !/.claude/
 /.claude/*
 !/.claude/agents/

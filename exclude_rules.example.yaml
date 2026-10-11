@@ -1,0 +1,17 @@
+# chunk.py가 로드하는 문장 제외 규칙 — 예시 파일
+# 실제 규칙은 이 파일을 복사해서 exclude_rules.yaml로 만들고 로컬에서만 관리
+# (eval_queries.json과 같은 방식. exclude_rules.yaml은 .gitignore로 제외됨)
+#
+# 작성 규칙:
+# - 텍스트 패턴 기준. 글꼴(크기/이름/이탤릭) 정보는 사용하지 않음 (chunking_spec v3 §2 준수)
+# - 매칭 전 NFKC 정규화를 적용하므로 합자(ﬁ→fi) 등은 ASCII로 작성
+# - re.IGNORECASE | re.MULTILINE으로 매칭 (^$는 줄 단위)
+# - 과매칭 방지: 기본은 ^…$ 줄 단위 앵커 사용. 본문 중간 문구를 지울 때만 앵커 없이 사용
+# - 표/heading/캡션/이미지 요소에는 적용되지 않음 (chunk.py apply_exclusions)
+# - 동작: 매칭된 부분만 re.sub로 제거. 요소의 남은 텍스트가 비면 그 요소는 제외됨
+
+rules:
+  # 예시 1: 기밀 고지 한 줄 헤더/푸터
+  - pattern: "^Confidential - Internal use only$"
+  # 예시 2: 페이지 번호 ("Page 3 of 49" 같은 단독 요소, 또는 본문과 합쳐진 경우 해당 줄만 제거)
+  - pattern: "^Page \\d+ of \\d+$"

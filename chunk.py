@@ -1,6 +1,11 @@
 """Stage 4-1: notes/chunking_spec.md 규칙대로 output/*.json → chunks.jsonl"""
-import glob, html, json, os, re
+import glob, html, json, os, re, unicodedata
 from transformers import AutoTokenizer
+
+try:
+    import yaml
+except ImportError:  # exclude_rules.yaml이 있으면 pyyaml 필요 (requirements.txt 참조)
+    yaml = None
 
 MAX_TOK, MIN_TOK, OVERLAP_MAX = 512, 50, 128
 tok = AutoTokenizer.from_pretrained("BAAI/bge-m3")
@@ -9,6 +14,16 @@ TOC_RE = re.compile(r"\S\s\d{1,3}(?=\s|$)")
 FIG_RE = re.compile(r"(Figure|Fig\.|Table|그림|표)\s*\d", re.I)
 BULLET_RE = re.compile(r"^\s*([●○•▪◦\-–]|https?://)")
 SENT_END_RE = re.compile(r"(다|요|[.?!:])\s*$")
+
+
+EXCLUDE_RULES, _excluded = [], 0
+_excl_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "exclude_rules.yaml")
+if os.path.exists(_excl_path):
+    if yaml is None:
+        raise SystemExit("exclude_rules.yaml이 있지만 pyyaml이 없습니다: pip install pyyaml (형식은 exclude_rules.example.yaml 참조)")
+    _cfg = yaml.safe_load(open(_excl_path, encoding="utf-8")) or {}
+    EXCLUDE_RULES = [re.compile(r["pattern"], re.I | re.M) for r in _cfg.get("rules", [])]  # MULTILINE: ^$가 줄 단위 매칭
+    print(f"exclude rules: {len(EXCLUDE_RULES)} loaded", flush=True)
 
 
 def below_ratio(n, ref):
@@ -56,6 +71,29 @@ def text_of(n):
     for k in n.get("kids") or []:
         s += " " + text_of(k)
     return html.unescape(s.replace("\x00", "").strip())
+
+
+def apply_exclusions(n):
+    """boilerplate 문장 제외 (exclude_rules.yaml). 매칭된 부분만 re.sub로 제거하고,
+    요소의 남은 텍스트가 비면 그 요소를 제외. 목록은 항목별로 적용. 표/heading/캡션/이미지는 건드리지 않음.
+    텍스트 패턴 기준이라 글꼴 정보는 사용하지 않음 (spec v3 §2 준수).
+    매칭 전 NFKC 정규화로 합자(ﬁ→fi) 등을 ASCII 패턴과 매칭. 매칭이 없는 요소는 원문 그대로 둠."""
+    global _excluded
+    if not EXCLUDE_RULES or n["type"] not in ("paragraph", "list item", "list"):
+        return n
+    if n["type"] == "list":
+        items = [li for li in map(apply_exclusions, n["list items"]) if li is not None]
+        return dict(n, **{"list items": items}) if items else None
+    t = norm = unicodedata.normalize("NFKC", text_of(n))
+    for rx in EXCLUDE_RULES:
+        t = rx.sub("", t)
+    if t == norm:
+        return n
+    t = re.sub(r"\n{2,}", "\n", re.sub(r"[ \t]+", " ", t)).strip()
+    if t:
+        return dict(n, content=html.escape(t, quote=False), kids=[])  # text_of가 다시 unescape하므로 escape해 둠
+    _excluded += 1
+    return None
 
 
 def table_rows(t):
@@ -171,6 +209,9 @@ def sections_of(doc):
             continue
         if not seen_sec and len(TOC_RE.findall(text_of(n))) >= 2:  # 목차 (spec §3-4)
             continue
+        n = apply_exclusions(n)  # exclude_rules.yaml boilerplate 제거
+        if n is None:
+            continue
         us = cur["units"]
         if cap and us and ntok(us[-1][0]) + ntok(text_of(n)) <= cur["limit"]:
             # 캡션은 직전 단위에 붙여 다음 청크 앞으로 넘어가지 않게 함.
@@ -248,4 +289,4 @@ if __name__ == "__main__":
             for i, c in enumerate(chunks_of(p)):
                 c = {"chunk_id": f"{stem}::{i:04d}", **c}
                 f.write(json.dumps(c, ensure_ascii=False) + "\n"); n += 1
-    print("chunks", n)
+    print("chunks", n, "| excluded elements:", _excluded)
