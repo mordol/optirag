@@ -6,6 +6,7 @@
 !/README.md
 !/SETUP_GUIDE.md
 !/requirements.txt
+!/requirements-serve.txt
 !/env.sh
 !/run_convert.py
 !/chunk.py

@@ -1,0 +1,8 @@
+# 검색 전용 PC용 (인덱스만 복사해서 MCP 서버·ask.py로 질의). PDF 변환·청킹·인덱스 생성은 requirements.txt 사용
+# Python 3.12 기준으로 검증한 버전 (2026-10-06). Java 불필요
+sentence-transformers==6.1.0
+transformers==5.18.0
+torch==2.14.1
+numpy==2.5.3
+rank-bm25==0.2.2
+mcp==2.3.0

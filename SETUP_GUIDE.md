@@ -11,6 +11,7 @@ PDF ─(run_convert.py)→ output/*.json ─(chunk.py)→ chunks.jsonl ─(build
 
 - 검증 환경: macOS (Apple Silicon), Python 3.12, OpenJDK 21. 2026-10-06에 빈 폴더에 새로 설치해 전 과정을 재현했습니다.
 - 처음 한 번만 하는 설치(§1~§4)와, 문서가 바뀔 때마다 하는 전처리(§5~§7), 그리고 질의(§8 CLI, §9 Claude Desktop·Codex 앱)로 나뉩니다.
+- 다른 PC에서 만든 인덱스를 받아 **검색·질의만 하는 PC**는 §13의 간단한 설치만 하면 됩니다.
 
 ---
 
@@ -375,3 +376,67 @@ optirag/
 ├── logs/requests.jsonl   # MCP 서버 요청 기록
 └── asks/                 # 질문별 LLM 입력 기록
 ```
+
+---
+
+## 13. 검색 전용 PC 설치 (인덱스만 복사해서 사용)
+
+PDF 변환과 인덱스 생성은 성능 좋은 PC에서 하고, 다른 PC에서는 결과물만 받아 질문만 하는 구성입니다.
+
+질문이 들어올 때마다 그 PC에서 질문을 임베딩(bge-m3)하고 재정렬(reranker)합니다. 그래서 **Python 가상환경은 검색 전용 PC에도 직접 설치해야 합니다.** 다만 PDF 변환용 Java와 opendataloader-pdf는 필요 없습니다.
+
+| 항목 | 필요 여부 | 크기 |
+|---|---|---|
+| 저장소 코드 (`retriever.py`, `mcp_server.py`, `ask.py`) | 필요 | 작음 |
+| 인덱스 파일 `chunks.jsonl`, `embeddings.npy`, `index_manifest.json` | 필요. 저장소 폴더 최상위에 둠 | 문서 1,000여 개 기준 약 220MB |
+| Python 3.12 가상환경 (`requirements-serve.txt`) | 필요 | 약 0.85GB (대부분 torch) |
+| 모델 (첫 실행 때 `~/.cache/huggingface`로 자동 다운로드) | bge-m3는 필수, reranker는 켤 때만 | 각 약 2.2GB |
+| `docs/`, `output/`, Java, opendataloader-pdf | 불필요 | |
+| Claude Code CLI | `ask.py`를 쓸 때만. Claude Desktop·Codex에서 MCP로 쓰면 불필요 | |
+
+### 13-1. 설치
+
+```bash
+mkdir -p ~/Workspace && cd ~/Workspace && gh repo clone mordol/optirag && cd optirag
+uv venv --python 3.12 .venv
+uv pip install --python .venv/bin/python -r requirements-serve.txt
+```
+
+uv가 없으면:
+```bash
+python3.12 -m venv .venv && .venv/bin/pip install -r requirements-serve.txt
+```
+
+### 13-2. 인덱스 복사
+
+인덱스를 만든 PC에서 **세 파일을 함께** 복사합니다. 하나라도 다른 시점의 파일이면 서버가 `인덱스 불일치` 오류를 냅니다.
+
+```bash
+# 인덱스를 만든 PC에서 실행 (<검색PC>는 호스트명 또는 Tailscale 이름)
+rsync -av chunks.jsonl embeddings.npy index_manifest.json <검색PC>:~/Workspace/optirag/
+```
+
+- 문서를 갱신했으면 같은 명령으로 다시 복사합니다. 서버를 재시작하지 않아도 다음 검색부터 새 인덱스를 씁니다.
+- 질의 임베딩 모델은 `index_manifest.json`에 기록된 모델(bge-m3)을 자동으로 사용합니다.
+
+### 13-3. 실행
+
+가상환경을 활성화합니다. `env.sh`는 Java 경로를 잡는 줄이 있어서, 검색 전용 PC에서는 이 명령으로 충분합니다.
+```bash
+source .venv/bin/activate
+```
+
+그다음 MCP 서버를 켭니다. 첫 실행 때 모델을 내려받습니다.
+```bash
+python mcp_server.py
+```
+
+앱 연결은 §9-2(Codex)와 §9-3(Claude Desktop)을 그대로 따릅니다. Claude Desktop 설정의 경로는 이 PC의 `.venv/bin/python`과 `mcp_server.py` 절대 경로로 바꾸세요.
+
+### 13-4. 저사양 PC
+
+- `OPTIRAG_RERANK=0`으로 reranker를 끄세요.
+  - 메모리가 약 4GB에서 약 2GB로 줄고, reranker 모델(2.2GB)도 내려받지 않습니다.
+  - CPU만 있는 PC에서는 질의당 검색 시간이 약 6초에서 0.1초 수준으로 줄어듭니다(샘플 인덱스, CPU 2스레드 실측).
+- 인덱스가 커지면 메모리가 수백 MB 정도 더 들 수 있습니다. 청크 4만 개 인덱스의 메모리는 아직 재지 않았습니다.
+
